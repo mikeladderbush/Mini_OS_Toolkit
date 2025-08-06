@@ -1,0 +1,2 @@
+#! /bin/sh
+xterm -geometry 80x24 -e /mt_shell_core

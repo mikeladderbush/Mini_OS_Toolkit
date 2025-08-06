@@ -3,11 +3,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
-#include <getopt.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <signal.h>
 
-int kernel_run_process(char process_path[]);
+#define SOCKET_PATH "/tmp/kernel_daemon.sock"
 
 typedef struct
 {
@@ -18,77 +20,6 @@ typedef struct
 
 #define MAX_TASKS 32
 Task task_table[MAX_TASKS];
-
-#define USAGE                                    \
-    "usage:\n"                                   \
-    " Kernel [options]\n"                        \
-    "options:\n"                                 \
-    " -c Command to be processed\n"              \
-    " -p Process for command to be enacted on\n" \
-    " -h Display help message\n"
-
-/* OPTIONS DESCRIPTOR ==============================================*/
-
-static struct option gLongOptions[] = {
-    {"command", required_argument, NULL, 'c'},
-    {"process", required_argument, NULL, 'p'},
-    {"help", no_argument, NULL, 'h'},
-    {NULL, 0, NULL, 0}};
-
-/* Main ===========================================================*/
-int main(int argc, char **argv)
-{
-
-    int option_char;
-    char command[256] = {0};
-    char process_path[256] = {0};
-
-    while ((option_char = getopt_long(argc, argv, "c:p:h", gLongOptions, NULL)) != -1)
-    {
-        switch (option_char)
-        {
-        case 'c': // Command to enact
-            strncpy(command, optarg, sizeof(command) - 1);
-            break;
-        case 'p': // Process to fork
-            strncpy(process_path, optarg, sizeof(process_path) - 1);
-            break;
-        case 'h': // Help
-            fprintf(stdout, "%s", USAGE);
-            exit(0);
-            break;
-        default:
-            fprintf(stderr, "%s", USAGE);
-            exit(1);
-        }
-    }
-
-    if (command[0] == '\0')
-    {
-        fprintf(stderr, "Error: No command specified.\n");
-        fprintf(stderr, "%s", USAGE);
-        exit(1);
-    }
-
-    if (process_path[0] == '\0')
-    {
-        fprintf(stderr, "Error: No process path specified.\n");
-        fprintf(stderr, "%s", USAGE);
-        exit(1);
-    }
-
-    if (strcmp(command, "run") == 0)
-    {
-        kernel_run_process(process_path);
-    }
-    else
-    {
-        fprintf(stderr, "%s", USAGE);
-        exit(1);
-    }
-
-    return 0;
-}
 
 int kernel_run_process(char process_path[])
 {
@@ -128,5 +59,74 @@ int kernel_run_process(char process_path[])
         return -1;
     }
 
+    return 0;
+}
+
+int main(void)
+{
+
+    int sockfd, clientfd;
+    struct sockaddr_un addr;
+    char buf[256];
+
+    unlink(SOCKET_PATH);
+
+    sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("socket");
+        exit(1);
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
+
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        perror("bind");
+        close(sockfd);
+        exit(1);
+    }
+
+    if (listen(sockfd, 5) < 0)
+    {
+        perror("listen");
+        close(sockfd);
+        exit(1);
+    }
+
+    while (1)
+    {
+        clientfd = accept(sockfd, NULL, NULL);
+        if (clientfd < 0)
+        {
+            perror("accept");
+            continue;
+        }
+
+        ssize_t n = read(clientfd, buf, sizeof(buf) - 1);
+        if (n > 0)
+        {
+            buf[n] = '\0';
+            printf("Received command: %s\n", buf);
+
+            char *cmd = strtok(buf, " ");
+            char *arg = strtok(NULL, " ");
+            if (cmd && strcmp(cmd, "run") == 0 && arg)
+            {
+                kernel_run_process(arg);
+                write(clientfd, "OK\n", 3);
+            }
+            else
+            {
+                write(clientfd, "Unknown command\n", 16);
+            }
+        }
+        close(clientfd);
+    }
+
+    close(sockfd);
+    unlink(SOCKET_PATH);
     return 0;
 }
