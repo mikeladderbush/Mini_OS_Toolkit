@@ -11,6 +11,7 @@
 
 #define SOCKET_PATH "/tmp/kernel_daemon.sock"
 
+// Task structure.
 typedef struct
 {
     pid_t pid;
@@ -18,11 +19,13 @@ typedef struct
     int status;
 } Task;
 
+// Task table for processes.
 #define MAX_TASKS 32
 Task task_table[MAX_TASKS];
 
 int kernel_run_process(char process_path[])
 {
+    // Fork process for and add the child to the task table.
     pid_t p = fork();
     if (p == 0)
     {
@@ -62,6 +65,7 @@ int kernel_run_process(char process_path[])
     return 0;
 }
 
+// Kernel socket, listens and accepts IPC commands.
 int main(void)
 {
 
@@ -105,6 +109,7 @@ int main(void)
             continue;
         }
 
+        // Reads and tokenizes arguments in the libclient command.
         ssize_t n = read(clientfd, buf, sizeof(buf) - 1);
         if (n > 0)
         {

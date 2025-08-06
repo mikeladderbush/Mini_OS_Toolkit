@@ -9,12 +9,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+// stat check for kernel daemon.
 int is_daemon_running()
 {
     struct stat st;
     return (stat("/tmp/kernel_daemon.sock", &st) == 0);
 }
 
+// Starts the kernel daemon.
 void start_kernel_daemon()
 {
     pid_t pid = fork();
@@ -77,6 +79,7 @@ int main(int argc, char **argv)
         }
     }
 
+    // Parses commands and builds full message for the kernel daemon.
     if (command[0] != '\0')
     {
         char full_command[512];
