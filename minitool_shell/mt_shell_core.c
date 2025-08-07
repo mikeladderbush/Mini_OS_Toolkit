@@ -10,14 +10,21 @@
 #include <fcntl.h>
 
 // stat check for kernel daemon.
-int is_daemon_running()
+int is_linux_running()
 {
     struct stat st;
     return (stat("/tmp/kernel_daemon.sock", &st) == 0);
 }
 
-// Starts the kernel daemon.
-void start_kernel_daemon()
+int is_windows_running()
+{
+    // Todo: add windows functionality.
+    // struct stat st;
+    // return (stat("/tmp/windows_daemon.sock", &st) == 0);
+}
+
+// Starts the linux kernel daemon.
+void start_linux()
 {
     pid_t pid = fork();
     if (pid == 0)
@@ -29,17 +36,25 @@ void start_kernel_daemon()
     usleep(200000);
 }
 
-#define USAGE                                    \
-    "usage:\n"                                   \
-    " Minitool [options]\n"                      \
-    "options:\n"                                 \
-    " -c Command to be processed\n"              \
-    " -p Process for command to be enacted on\n" \
+// Starts the windows kernel daemon.
+void start_windows()
+{
+    // CreateProcess using windows kernel bin.
+}
+
+#define USAGE                                                                             \
+    "usage:\n"                                                                            \
+    " Minitool [options]\n"                                                               \
+    "options:\n"                                                                          \
+    " -c Command to be processed\n"                                                       \
+    " -p Process for command to be enacted on\n"                                          \
+    " -os Environment to send command to 'both', 'linux', or 'windows', defaults to both" \
     " -h Display help message\n"
 
 /* OPTIONS DESCRIPTOR ==============================================*/
 
 static struct option gLongOptions[] = {
+    ("environment", required_argument, NULL, 'os'),
     {"command", required_argument, NULL, 'c'},
     {"process", required_argument, NULL, 'p'},
     {"help", no_argument, NULL, 'h'},
@@ -52,17 +67,26 @@ int main(int argc, char **argv)
     int option_char;
     char command[256] = {0};
     char process_path[256] = {0};
+    char environment[256] = {0};
     char response[256] = {0};
 
-    if (!is_daemon_running())
+    if (!is_linux_running())
     {
-        start_kernel_daemon();
+        start_linux();
     }
 
-    while ((option_char = getopt_long(argc, argv, "c:p:h", gLongOptions, NULL)) != -1)
+    if (!is_windows_running())
+    {
+        start_windows();
+    }
+
+    while ((option_char = getopt_long(argc, argv, "os:c:p:h", gLongOptions, NULL)) != -1)
     {
         switch (option_char)
         {
+        case 'os': // Specified environment to receive command
+            strncpy(environment, optarg, sizeof(environment) - 1);
+            break;
         case 'c': // Command to enact
             strncpy(command, optarg, sizeof(command) - 1);
             break;
@@ -79,57 +103,47 @@ int main(int argc, char **argv)
         }
     }
 
-    // Parses commands and builds full message for the kernel daemon.
+    // Parses commands and builds full message for the kernel daemons.
     if (command[0] != '\0')
     {
         char full_command[512];
         if (process_path[0] != '\0')
-        {
             snprintf(full_command, sizeof(full_command), "%s %s", command, process_path);
-        }
         else
-        {
             snprintf(full_command, sizeof(full_command), "%s", command);
-        }
 
-        if (send_command_to_daemon(full_command, response, sizeof(response)) == 0)
+        if (send_command_to_daemons(full_command, response, sizeof(response), environment) == 0)
         {
-            printf("Daemon: %s\n", response);
+            printf("%s\n", response);
         }
         else
         {
-            printf("Failed to send command to daemon.\n");
+            printf("Failed to send command to daemons.\n");
         }
         return 0;
     }
 
-    // Interactive mode.
+    // Interactive mode
     printf("Minitool Shell (type 'exit' to quit)\n");
     while (1)
     {
         printf("> ");
         fflush(stdout);
         if (!fgets(command, sizeof(command), stdin))
-        {
             break;
-        }
-
         command[strcspn(command, "\n")] = 0;
-
         if (strcmp(command, "exit") == 0)
-        {
             break;
-        }
 
-        if (send_command_to_daemon(command, response, sizeof(response)) == 0)
+        if (send_command_to_daemons(command, response, sizeof(response), environment) == 0)
         {
-            printf("Daemon: %s\n", response);
+            printf("%s\n", response);
         }
         else
         {
-            printf("Failed to send command to daemon.\n");
+            printf("Failed to send command to daemons.\n");
         }
-    }
 
-    return 0;
+        return 0;
+    }
 }
