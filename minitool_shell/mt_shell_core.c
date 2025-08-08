@@ -12,15 +12,46 @@
 // stat check for kernel daemon.
 int is_linux_running()
 {
-    struct stat st;
-    return (stat("/tmp/kernel_daemon.sock", &st) == 0);
+    int sockfd, clientfd;
+    struct sockaddr_in addr;
+    char buf[256];
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("socket");
+        exit(1);
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(PORT);
 }
 
 int is_windows_running()
 {
-    // Todo: add windows functionality.
-    // struct stat st;
-    // return (stat("/tmp/windows_daemon.sock", &st) == 0);
+    int sockfd;
+    struct sockaddr_in addr;
+    int result = 0;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        return 0;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(12346);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+    {
+        result = 1;
+    }
+
+    close(sockfd);
+    return result;
 }
 
 // Starts the linux kernel daemon.
@@ -42,19 +73,19 @@ void start_windows()
     // CreateProcess using windows kernel bin.
 }
 
-#define USAGE                                                                             \
-    "usage:\n"                                                                            \
-    " Minitool [options]\n"                                                               \
-    "options:\n"                                                                          \
-    " -c Command to be processed\n"                                                       \
-    " -p Process for command to be enacted on\n"                                          \
-    " -os Environment to send command to 'both', 'linux', or 'windows', defaults to both" \
+#define USAGE                                                                            \
+    "usage:\n"                                                                           \
+    " Minitool [options]\n"                                                              \
+    "options:\n"                                                                         \
+    " -e Environment to send command to 'both', 'linux', or 'windows', defaults to both" \
+    " -c Command to be processed\n"                                                      \
+    " -p Process for command to be enacted on\n"                                         \
     " -h Display help message\n"
 
 /* OPTIONS DESCRIPTOR ==============================================*/
 
 static struct option gLongOptions[] = {
-    ("environment", required_argument, NULL, 'os'),
+    {"environment", required_argument, NULL, 'e'},
     {"command", required_argument, NULL, 'c'},
     {"process", required_argument, NULL, 'p'},
     {"help", no_argument, NULL, 'h'},
@@ -80,11 +111,11 @@ int main(int argc, char **argv)
         start_windows();
     }
 
-    while ((option_char = getopt_long(argc, argv, "os:c:p:h", gLongOptions, NULL)) != -1)
+    while ((option_char = getopt_long(argc, argv, "e:c:p:h", gLongOptions, NULL)) != -1)
     {
         switch (option_char)
         {
-        case 'os': // Specified environment to receive command
+        case 'e': // Specified environment to receive command
             strncpy(environment, optarg, sizeof(environment) - 1);
             break;
         case 'c': // Command to enact

@@ -4,14 +4,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <signal.h>
 #include <dirent.h>
 #include <ctype.h>
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
@@ -133,17 +130,17 @@ int main(void)
             if (cmd && strcmp(cmd, "run") == 0 && arg)
             {
                 kernel_run_process(arg);
-                send(clientfd, "OK\n", 3);
+                send(clientfd, "OK\n", 3, 0);
             }
             else if (cmd && strcmp(cmd, "processes") == 0)
             {
                 char procbuf[4096];
                 monitor_running_tasks(procbuf, sizeof(procbuf));
-                send(clientfd, procbuf, strlen(procbuf));
+                send(clientfd, procbuf, strlen(procbuf), 0);
             }
             else
             {
-                send(clientfd, "Unknown command\n", 16);
+                send(clientfd, "Unknown command\n", 16, 0);
             }
         }
         closesocket(clientfd);

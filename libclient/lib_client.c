@@ -5,8 +5,6 @@
 #include <unistd.h>
 #include <netinet/in.h>
 
-#define SOCKET_PATH "/tmp/linux_kernel_daemon.sock"
-
 int send_command_to_linux(const char *command, char *response, size_t response_size)
 {
     // Socket file descriptor, address struct and buffer for write.
