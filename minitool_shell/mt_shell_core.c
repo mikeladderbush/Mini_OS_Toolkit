@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     char command[256] = {0};
     char process_path[256] = {0};
     char environment[256] = {0};
-    char response[256] = {0};
+    char response[4096] = {0};
 
     start_linux();
     start_windows();
@@ -150,7 +150,5 @@ int main(int argc, char **argv)
         {
             printf("Failed to send command to daemons.\n");
         }
-
-        return 0;
     }
 }

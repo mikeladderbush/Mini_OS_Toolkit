@@ -30,7 +30,7 @@ void cleanup_socket()
     char cmd[128];
     snprintf(cmd, sizeof(cmd), "sudo fuser -k %d/tcp", PORT);
     system(cmd);
-    sleep(2);
+    sleep(1);
 }
 
 int kernel_run_process(char process_path[])

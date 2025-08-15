@@ -58,6 +58,7 @@ int kernel_run_process(const char *process_path)
 
 int monitor_running_tasks(char *outbuf, size_t outbuf_size)
 {
+    outbuf[0] = '\0';
     FILE *fp = _popen("tasklist", "r");
     if (!fp)
     {

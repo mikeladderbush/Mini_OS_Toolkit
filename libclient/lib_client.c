@@ -8,7 +8,7 @@
 
 #define WINDOWS_IP "192.168.1.165"
 
-int send_command_to_linux(const char *command, char *response, size_t response_size)
+int send_command_to_linux(const char *command, char *response, ssize_t response_size)
 {
     // Socket file descriptor, address struct and buffer for write.
     int sockfd;
@@ -47,24 +47,20 @@ int send_command_to_linux(const char *command, char *response, size_t response_s
         return -1;
     }
 
-    if (response && response_size > 0)
+    ssize_t total = 0, n;
+    while ((n = read(sockfd, response + total, response_size - total - 1)) > 0)
     {
-        ssize_t n = read(sockfd, response, response_size - 1);
-        if (n > 0)
-        {
-            response[n] = '\0';
-        }
-        else
-        {
-            response[0] = '\0';
-        }
+        total += n;
+        if (total >= response_size - 1)
+            break;
     }
+    response[total] = '\0';
 
     close(sockfd);
     return 0;
 }
 
-int send_command_to_windows(const char *command, char *response, size_t response_size)
+int send_command_to_windows(const char *command, char *response, ssize_t response_size)
 {
     // Todo: create windows client socket that will send the mt_shell request to the windows kernel.
     int sockfd;
@@ -98,21 +94,17 @@ int send_command_to_windows(const char *command, char *response, size_t response
         return -1;
     }
 
-    if (response && response_size > 0)
+    ssize_t total = 0, n;
+    while ((n = read(sockfd, response + total, response_size - total - 1)) > 0)
     {
-        ssize_t n = read(sockfd, response, response_size - 1);
-        if (n > 0)
-        {
-            response[n] = '\0';
-        }
-        else
-        {
-            response[0] = '\0';
-        }
+        total += n;
+        if (total >= response_size - 1)
+            break;
     }
+    response[total] = '\0';
 
     close(sockfd);
-    return -1;
+    return 0;
 }
 
 int send_command_to_daemons(const char *command, char *response, size_t response_size, const char *environment)
