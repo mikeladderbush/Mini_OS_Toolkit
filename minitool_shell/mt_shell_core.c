@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -8,69 +11,49 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
 
-// stat check for kernel daemon.
-int is_linux_running()
-{
-    int sockfd, clientfd;
-    struct sockaddr_in addr;
-    char buf[256];
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        perror("socket");
-        exit(1);
-    }
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(PORT);
-}
-
-int is_windows_running()
-{
-    int sockfd;
-    struct sockaddr_in addr;
-    int result = 0;
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        return 0;
-    }
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(12346);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-    if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
-    {
-        result = 1;
-    }
-
-    close(sockfd);
-    return result;
-}
+#define LINUX_PORT 12345
+#define WINDOWS_PORT 12346
+#define WINDOWS_IP "192.168.1.165"
 
 // Starts the linux kernel daemon.
 void start_linux()
 {
+#ifndef _WIN32
     pid_t pid = fork();
     if (pid == 0)
     {
-        execl("./kernel_server_bin", "./kernel_server_bin", (char *)NULL);
+        execl("./linux_kernel_server_bin", "./linux_kernel_server_bin", (char *)NULL);
         perror("Failed to start kernel_server");
         exit(1);
     }
     usleep(200000);
+#else
+    return 0;
+#endif
 }
 
 // Starts the windows kernel daemon.
 void start_windows()
 {
+#ifdef _WIN32
     // CreateProcess using windows kernel bin.
+    STARTUPINFO si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+
+    if (!CreateProcess(NULL, "windows_kernel_server_bin.exe", NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    {
+        fprintf(stderr, "CreateProcess failed (%lu)\n", GetLastError());
+        return;
+    }
+#else
+    return;
+#endif
 }
 
 #define USAGE                                                                            \
@@ -101,15 +84,8 @@ int main(int argc, char **argv)
     char environment[256] = {0};
     char response[256] = {0};
 
-    if (!is_linux_running())
-    {
-        start_linux();
-    }
-
-    if (!is_windows_running())
-    {
-        start_windows();
-    }
+    start_linux();
+    start_windows();
 
     while ((option_char = getopt_long(argc, argv, "e:c:p:h", gLongOptions, NULL)) != -1)
     {

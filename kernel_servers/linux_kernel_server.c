@@ -27,7 +27,10 @@ Task task_table[MAX_TASKS];
 
 void cleanup_socket()
 {
-    exit(0);
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "sudo fuser -k %d/tcp", PORT);
+    system(cmd);
+    sleep(2);
 }
 
 int kernel_run_process(char process_path[])
@@ -121,6 +124,8 @@ int main(void)
     signal(SIGTERM, cleanup_socket);
     signal(SIGHUP, cleanup_socket);
 
+    cleanup_socket();
+
     int sockfd, clientfd;
     struct sockaddr_in addr;
     char buf[256];
@@ -132,12 +137,20 @@ int main(void)
         exit(1);
     }
 
+    int opt = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    {
+        perror("setsockopt");
+        close(sockfd);
+        exit(1);
+    }
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(PORT);
 
-    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0)
     {
         perror("bind");
         close(sockfd);

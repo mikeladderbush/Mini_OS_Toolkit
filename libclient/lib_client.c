@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define WINDOWS_IP "192.168.1.165"
 
 int send_command_to_linux(const char *command, char *response, size_t response_size)
 {
@@ -64,10 +67,51 @@ int send_command_to_linux(const char *command, char *response, size_t response_s
 int send_command_to_windows(const char *command, char *response, size_t response_size)
 {
     // Todo: create windows client socket that will send the mt_shell request to the windows kernel.
+    int sockfd;
+    struct sockaddr_in addr;
     char buf[256];
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(WINDOWS_IP);
+    addr.sin_port = htons(12346);
+
+    if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        perror("connect");
+        close(sockfd);
+        return -1;
+    }
+
     snprintf(buf, sizeof(buf), "%s", command);
+    if (write(sockfd, buf, strlen(buf)) < 0)
+    {
+        perror("write");
+        close(sockfd);
+        return -1;
+    }
+
     if (response && response_size > 0)
-        response[0] = '\0';
+    {
+        ssize_t n = read(sockfd, response, response_size - 1);
+        if (n > 0)
+        {
+            response[n] = '\0';
+        }
+        else
+        {
+            response[0] = '\0';
+        }
+    }
+
+    close(sockfd);
     return -1;
 }
 

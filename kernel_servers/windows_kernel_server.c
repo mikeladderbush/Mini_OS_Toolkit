@@ -13,6 +13,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #define PORT 12346
+#define IP "192.168.1.165"
 
 // Task structure.
 typedef struct
@@ -25,6 +26,14 @@ typedef struct
 // Task table for processes.
 #define MAX_TASKS 32
 Task task_table[MAX_TASKS];
+
+void cleanup_socket()
+{
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "for /f \"tokens=5\" %%a in ('netstat -ano ^| findstr :%d ^| findstr LISTENING') do taskkill /PID %%a /F", PORT);
+    system(cmd);
+    Sleep(1000);
+}
 
 int kernel_run_process(const char *process_path)
 {
@@ -76,6 +85,9 @@ int monitor_running_tasks(char *outbuf, size_t outbuf_size)
 // Kernel socket, listens and accepts IPC commands.
 int main(void)
 {
+
+    cleanup_socket();
+
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -90,12 +102,20 @@ int main(void)
         exit(1);
     }
 
+    int opt = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0)
+    {
+        fprintf(stderr, "setsockopt failed: %d\n", WSAGetLastError());
+        closesocket(sockfd);
+        exit(1);
+    }
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = inet_addr(IP);
     addr.sin_port = htons(PORT);
 
-    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR)
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0)
     {
         fprintf(stderr, "socket failed: %d\n", WSAGetLastError());
         closesocket(sockfd);
